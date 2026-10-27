@@ -635,7 +635,7 @@ func TestVLLMUnknownTag(t *testing.T) {
 	event, err := adapter.decodeVLLMEvent(rawBytes)
 	assert.Error(t, err)
 	assert.Nil(t, event)
-	assert.Contains(t, err.Error(), "unknown vLLM event tag")
+	assert.ErrorIs(t, err, errUnknownTypedEventTag)
 }
 
 // TestVLLMMalformedPayload tests error handling for malformed msgpack data.
@@ -1322,4 +1322,16 @@ func TestDecodeVLLMEvent_LargeExtraKeyOrder(t *testing.T) {
 			require.Equal(t, [][]any{{value}}, event.(*kvevents.BlockStoredEvent).ExtraKeys)
 		})
 	}
+}
+
+func TestTypedBatchRequiresExplicitSchema(t *testing.T) {
+	payload, err := msgpack.Marshal([]any{1.0, []any{}})
+	require.NoError(t, err)
+	var batch msgpackTypedEventBatch
+	require.EqualError(t, msgpack.Unmarshal(payload, &batch), "event batch schema is required")
+
+	batch.schema = &vllmWireSchema
+	require.NoError(t, msgpack.Unmarshal(payload, &batch))
+	batch.schema = &sglangWireSchema
+	require.ErrorContains(t, msgpack.Unmarshal(payload, &batch), "SGLang event batch: need at least 3 fields")
 }
