@@ -33,6 +33,7 @@ var sglangWireSchema = eventWireSchema{
 	storedFields:         sglangBlockStoredFieldDecoders,
 	removedFields:        sglangBlockRemovedFieldDecoders,
 	storedEvent:          (*typedEventFields).sglangBlockStoredEvent,
+	unknownTagPrefix:     "unknown event tag",
 }
 
 // SGLangAdapter parses SGLang KV events from arrays and tagged maps.

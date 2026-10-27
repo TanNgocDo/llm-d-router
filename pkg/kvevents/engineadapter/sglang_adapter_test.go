@@ -478,6 +478,10 @@ func TestSGLangMapEncodedErrors(t *testing.T) {
 		event   any
 		wantErr string
 	}{
+		"unknown tag": {
+			event:   map[string]any{"type": "SomethingNew"},
+			wantErr: "unknown event tag: SomethingNew",
+		},
 		"missing tag": {
 			event:   map[string]any{"block_hashes": []any{uint64(1)}},
 			wantErr: `missing the "type" tag`,
@@ -519,7 +523,7 @@ func TestSGLangUnknownTag(t *testing.T) {
 	result, err := decodeSGLangEvent(rawBytes)
 	assert.Error(t, err)
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, errUnknownTypedEventTag)
+	assert.Contains(t, err.Error(), "unknown event tag")
 }
 
 func TestSGLangParseMessage_BoundedUnknownField(t *testing.T) {

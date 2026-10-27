@@ -878,6 +878,22 @@ func TestVLLMParseMessage_SkipsUnknownEventTags(t *testing.T) {
 	}
 }
 
+func TestVLLMParseMessage_TruncatedUnknownEventRejectsBatch(t *testing.T) {
+	var payload bytes.Buffer
+	encoder := msgpack.NewEncoder(&payload)
+	require.NoError(t, encoder.EncodeArrayLen(2))
+	require.NoError(t, encoder.EncodeFloat64(123.0))
+	require.NoError(t, encoder.EncodeArrayLen(1))
+	require.NoError(t, encoder.EncodeArrayLen(3))
+	require.NoError(t, encoder.EncodeString("SomethingNew"))
+
+	_, _, _, err := NewVLLMAdapter().ParseMessage(&kvevents.RawMessage{
+		Topic:   "kv@pod-1@m",
+		Payload: payload.Bytes(),
+	})
+	assert.Error(t, err)
+}
+
 func TestVLLMParseMessage_StreamAlignment(t *testing.T) {
 	var payload bytes.Buffer
 	encoder := msgpack.NewEncoder(&payload)

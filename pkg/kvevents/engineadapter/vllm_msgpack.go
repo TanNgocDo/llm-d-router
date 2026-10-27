@@ -40,7 +40,7 @@ const maxDecodeDepth = 64
 // Limit hash processing because only the final bytes contribute to the hash.
 const maxDecodeHashBytes = 64
 
-// errUnknownTypedEventTag is returned only after the event's fields are
+// errUnknownTypedEventTag is returned only after all fields of the event are
 // consumed, so a batch decoder can continue with the next event.
 var errUnknownTypedEventTag = errors.New("unknown typed event tag")
 
@@ -51,7 +51,10 @@ type eventWireSchema struct {
 	minimumRemovedFields int
 	storedFields         []eventFieldDecoder
 	removedFields        []eventFieldDecoder
-	storedEvent func(*typedEventFields) *kvevents.BlockStoredEvent
+	storedEvent          func(*typedEventFields) *kvevents.BlockStoredEvent
+	// skipUnknownTags drops events with an unknown tag instead of rejecting the batch.
+	skipUnknownTags  bool
+	unknownTagPrefix string
 }
 
 type msgpackTypedEventBatch struct {
@@ -90,7 +93,8 @@ func (b *msgpackTypedEventBatch) DecodeMsgpack(dec *msgpack.Decoder) error {
 		b.events = make([]kvevents.GenericEvent, 0, min(eventCount, maxDecodePreallocate))
 		for range eventCount {
 			event, err := decodeTypedEventFromDecoder(dec, b.schema)
-			// Skip events with tags this adapter does not know so the rest of the batch still reaches the index.
+			// Skip events with tags this adapter does not know so the rest of
+			// the batch still reaches the index.
 			if errors.Is(err, errUnknownTypedEventTag) {
 				continue
 			}
@@ -178,6 +182,9 @@ func decodeArrayTypedEvent(dec *msgpack.Decoder, schema *eventWireSchema) (kveve
 		}
 		return &kvevents.AllBlocksClearedEvent{}, nil
 	default:
+		if !schema.skipUnknownTags {
+			return nil, fmt.Errorf("%s: %s", schema.unknownTagPrefix, tag)
+		}
 		if err := skipFields(dec, fieldCount-1); err != nil {
 			return nil, err
 		}
@@ -440,6 +447,9 @@ func decodeMapTypedEvent(dec *msgpack.Decoder, schema *eventWireSchema) (kvevent
 	case eventTagAllBlocksCleared:
 		return &kvevents.AllBlocksClearedEvent{}, nil
 	default:
+		if !schema.skipUnknownTags {
+			return nil, fmt.Errorf("%s: %s", schema.unknownTagPrefix, fields.tag)
+		}
 		return nil, errUnknownTypedEventTag
 	}
 }
